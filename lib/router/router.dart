@@ -1,3 +1,4 @@
+```dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:imsnsit/root_scaffold.dart';
@@ -5,8 +6,6 @@ import 'package:imsnsit/screens/about_screen.dart';
 import 'package:imsnsit/screens/attendance/attandance_screen.dart';
 import 'package:imsnsit/screens/authentication/login_screen.dart';
 import 'package:imsnsit/screens/authentication/manual_relogin.dart';
-import 'package:imsnsit/screens/faculty/faculty_search.dart';
-import 'package:imsnsit/screens/faculty/faculty_time_table.dart';
 import 'package:imsnsit/screens/initial_screen.dart';
 import 'package:imsnsit/screens/profile_screen.dart';
 import 'package:imsnsit/screens/attendance/subject_attendance_screen.dart';
@@ -20,9 +19,6 @@ final _shellNavigatorProfileKey =
 final _shellNavigatorAttendanceKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellAttendance');
 
-final _shellNavigatorFacultyKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellFaculty');
-
 class MyAppRouter {
   static GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -30,14 +26,11 @@ class MyAppRouter {
     routes: [
       StatefulShellRoute.indexedStack(
         builder: (context, state, child) {
-          print(state.fullPath);
-
           return AppScaffold(
             child: child,
           );
         },
         branches: [
-          // ATTENDANCE
           StatefulShellBranch(
             navigatorKey: _shellNavigatorAttendanceKey,
             routes: [
@@ -60,8 +53,6 @@ class MyAppRouter {
               ),
             ],
           ),
-
-          // PROFILE
           StatefulShellBranch(
             navigatorKey: _shellNavigatorProfileKey,
             routes: [
@@ -73,67 +64,32 @@ class MyAppRouter {
               ),
             ],
           ),
-
-          // FACULTY
-          StatefulShellBranch(
-            navigatorKey: _shellNavigatorFacultyKey,
-            routes: [
-              GoRoute(
-                path: '/screens/faculty/search',
-                pageBuilder: (context, state) => const MaterialPage(
-                  child: FacultySearch(),
-                ),
-              ),
-              GoRoute(
-                name: 'faculty_time_table',
-                path:
-                    '/screens/faculty/time_table/:tutor/:tutorCode/:sem',
-                pageBuilder: (context, state) => MaterialPage(
-                  child: FacultyTT(
-                    tutor: state.pathParameters['tutor']!,
-                    tutorCode: state.pathParameters['tutorCode']!,
-                    sem: state.pathParameters['sem']!,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
-
-      // LOGIN
       GoRoute(
         path: '/authentication/login_screen',
         pageBuilder: (context, state) => const MaterialPage(
           child: LoginScreen(),
         ),
       ),
-
-      // MANUAL LOGIN
       GoRoute(
         path: '/authentication/manual_login',
         pageBuilder: (context, state) => const MaterialPage(
           child: ManualRelogin(),
         ),
       ),
-
-      // ABOUT
       GoRoute(
         path: '/about_screen',
         pageBuilder: (context, state) => const MaterialPage(
           child: AboutScreen(),
         ),
       ),
-
-      // INITIAL SCREEN
       GoRoute(
         path: '/initial_screen',
         pageBuilder: (context, state) => const MaterialPage(
           child: InitialScreen(),
         ),
       ),
-
-      // UPDATE
       GoRoute(
         path: '/update_screen',
         pageBuilder: (context, state) => const MaterialPage(
@@ -145,3 +101,4 @@ class MyAppRouter {
     ],
   );
 }
+```
