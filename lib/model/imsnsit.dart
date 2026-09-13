@@ -2,13 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cookie_store/cookie_store.dart';
-import 'package:flutter/material.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart';
 import 'package:http/http.dart' as http;
 import 'package:imsnsit/model/functions.dart';
 import 'package:imsnsit/model/session.dart';
-import 'package:imsnsit/parsers/parseData.dart';
+import 'package:imsnsit/parsers/parse_data.dart';
 import 'package:imsnsit/provider/intenet_availability.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -642,9 +641,9 @@ class Ims {
       'sem': semester ?? '',
       'enc_sem': encSem,
       'submit': 'Submit',
-      'recentitycode': rollNo ?? '',
-      'dept': dept ?? '',
-      'degree': degree ?? '',
+      'recentitycode': rollNo,
+      'dept': dept,
+      'degree': degree,
       'ename': '',
       'ecode': '',
     };
@@ -737,9 +736,9 @@ class Ims {
       'sem': semester ?? '',
       'enc_sem': encSem,
       'submit': 'Submit',
-      'recentitycode': rollNo ?? '',
-      'dept': dept ?? '',
-      'degree': degree ?? '',
+      'recentitycode': rollNo,
+      'dept': dept,
+      'degree': degree,
       'ename': '',
       'ecode': '',
     };
