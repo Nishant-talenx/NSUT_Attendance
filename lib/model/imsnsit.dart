@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:cookie_store/cookie_store.dart';
 import 'package:flutter/material.dart';
-import 'package:html/dom.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart';
 import 'package:http/http.dart' as http;
 import 'package:imsnsit/model/functions.dart';
@@ -292,14 +292,14 @@ class Ims {
 
       referrer = response.request?.url.toString();
 
-      final List<Element> links =
+      final List<dom.Element> links =
           doc.getElementsByTagName('a');
 
       profileUrl = null;
       myActivitiesUrl = null;
       logoutUrl = null;
 
-      for (final Element link in links) {
+      for (final dom.Element link in links) {
         final String text = link.text.trim();
         final String? href = link.attributes['href'];
 
@@ -511,10 +511,10 @@ class Ims {
 
       final doc = parse(response.body);
 
-      final List<Element> links =
+      final List<dom.Element> links =
           doc.getElementsByTagName('a');
 
-      for (final Element linkElement in links) {
+      for (final dom.Element linkElement in links) {
         final String? link =
             linkElement.attributes['href'];
 
