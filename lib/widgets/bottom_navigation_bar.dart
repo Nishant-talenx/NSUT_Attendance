@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:imsnsit/provider/mode_provider.dart';
@@ -19,7 +20,6 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
 
     if (context.read<ModeProvider>().offline) {
@@ -30,12 +30,6 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
       if (!prefs.containsKey("attendanceDataLastUpdated")) {
         disabledIndexes.add(1);
       }
-
-      if (!prefs.containsKey("roomsDataLastUpdated")) {
-        disabledIndexes.add(2);
-      }
-
-      disabledIndexes.add(3);
     }
   }
 
@@ -49,12 +43,6 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
         context.go('/profile_screen');
       } else if (index == 1) {
         context.go('/attendance/total');
-      } else if (index == 2) {
-        context.go('/rooms');
-      } else if (index == 3) {
-        context.go('/screens/faculty/search');
-      } else {
-        context.go('/');
       }
     }
   }
@@ -67,19 +55,23 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
         borderRadius: BorderRadius.circular(12),
         child: Theme(
           data: Theme.of(context).copyWith(
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
           child: BottomNavigationBar(
             selectedItemColor:
                 Theme.of(context).colorScheme.onSecondary.withAlpha(150),
             selectedLabelStyle: GoogleFonts.lexend(),
-            unselectedItemColor: Theme.of(context).colorScheme.onBackground,
+            unselectedItemColor:
+                Theme.of(context).colorScheme.onBackground,
             unselectedLabelStyle: GoogleFonts.lexend(),
             selectedIconTheme: IconThemeData(
-                color:
-                    Theme.of(context).colorScheme.onSecondary.withAlpha(150)),
+              color:
+                  Theme.of(context).colorScheme.onSecondary.withAlpha(150),
+            ),
             unselectedIconTheme: IconThemeData(
-                color: Theme.of(context).colorScheme.onBackground),
+              color: Theme.of(context).colorScheme.onBackground,
+            ),
             backgroundColor: Theme.of(context).colorScheme.primary,
             type: BottomNavigationBarType.fixed,
             elevation: 2,
@@ -89,13 +81,9 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
                 label: 'Profile',
               ),
               BottomNavigationBarItem(
-                  icon: Icon(
-                    Icons.calendar_month,
-                  ),
-                  label: 'Attendance'),
-              BottomNavigationBarItem(icon: Icon(Icons.laptop), label: 'APJ'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.schedule), label: 'Faculty'),
+                icon: Icon(Icons.calendar_month),
+                label: 'Attendance',
+              ),
             ],
             currentIndex: _selectedIndex,
             onTap: onItemTapped,
