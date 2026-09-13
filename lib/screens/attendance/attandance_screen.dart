@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:imsnsit/model/functions.dart';
 import 'package:imsnsit/provider/ims_provider.dart';
 import 'package:imsnsit/provider/mode_provider.dart';
-import 'package:imsnsit/widgets/conditional_visibilty.dart';
 import 'package:imsnsit/widgets/outdated_data_overlay.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
