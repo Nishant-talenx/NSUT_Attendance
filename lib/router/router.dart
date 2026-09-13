@@ -9,117 +9,139 @@ import 'package:imsnsit/screens/faculty/faculty_search.dart';
 import 'package:imsnsit/screens/faculty/faculty_time_table.dart';
 import 'package:imsnsit/screens/initial_screen.dart';
 import 'package:imsnsit/screens/profile_screen.dart';
-import 'package:imsnsit/screens/rooms_screen.dart';
 import 'package:imsnsit/screens/attendance/subject_attendance_screen.dart';
 import 'package:imsnsit/widgets/update_dialog.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final _shellNavigatorProfileKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
+
 final _shellNavigatorAttendanceKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellAttendance');
-final _shellNavigatorRoomsKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellRooms');
+
 final _shellNavigatorFacultyKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellFaculty');
 
 class MyAppRouter {
   static GoRouter router = GoRouter(
-      navigatorKey: _rootNavigatorKey,
-      initialLocation: '/initial_screen',
-      routes: [
-        StatefulShellRoute.indexedStack(
-            builder: (context, state, child) {
-              print(state.fullPath);
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/initial_screen',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, child) {
+          print(state.fullPath);
 
-              return AppScaffold(
-                child: child,
-              );
-            },
-            branches: [
-              StatefulShellBranch(
-                  navigatorKey: _shellNavigatorAttendanceKey,
-                  routes: [
-                    GoRoute(
-                      path: '/attendance/total',
-                      pageBuilder: (context, state) => const MaterialPage(
-                          child: AttandanceScreen(), maintainState: true),
-                    ),
-                    GoRoute(
-                      name: 'subject_attendance',
-                      path: '/attendance/subject_wise/:subject/:subjectCode',
-                      pageBuilder: (context, state) => MaterialPage(
-                          child: SubjectAttandanceScreen(
-                        subject: state.pathParameters['subject']!,
-                        subjectCode: state.pathParameters['subjectCode']!,
-                      )),
-                    ),
-                  ]),
-              StatefulShellBranch(
-                  navigatorKey: _shellNavigatorRoomsKey,
-                  routes: [
-                    GoRoute(
-                      path: '/rooms',
-                      pageBuilder: (context, state) =>
-                          const MaterialPage(child: RoomScreen()),
-                    ),
-                  ]),
-              StatefulShellBranch(
-                  navigatorKey: _shellNavigatorProfileKey,
-                  routes: [
-                    GoRoute(
-                      path: '/profile_screen',
-                      pageBuilder: (context, state) =>
-                          const MaterialPage(child: ProfileScreen()),
-                    ),
-                  ]),
-              StatefulShellBranch(
-                  navigatorKey: _shellNavigatorFacultyKey,
-                  routes: [
-                    GoRoute(
-                      path: '/screens/faculty/search',
-                      pageBuilder: (context, state) =>
-                          const MaterialPage(child: FacultySearch()),
-                    ),
-                    GoRoute(
-                      name: 'faculty_time_table',
-                      path:
-                          '/screens/faculty/time_table/:tutor/:tutorCode/:sem',
-                      pageBuilder: (context, state) => MaterialPage(
-                          child: FacultyTT(
-                        tutor: state.pathParameters['tutor']!,
-                        tutorCode: state.pathParameters['tutorCode']!,
-                        sem: state.pathParameters['sem']!,
-                      )),
-                    ),
-                  ])
-            ]),
-        GoRoute(
-          path: '/authentication/login_screen',
-          pageBuilder: (context, state) =>
-              const MaterialPage(child: LoginScreen()),
+          return AppScaffold(
+            child: child,
+          );
+        },
+        branches: [
+          // ATTENDANCE
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorAttendanceKey,
+            routes: [
+              GoRoute(
+                path: '/attendance/total',
+                pageBuilder: (context, state) => const MaterialPage(
+                  child: AttandanceScreen(),
+                  maintainState: true,
+                ),
+              ),
+              GoRoute(
+                name: 'subject_attendance',
+                path: '/attendance/subject_wise/:subject/:subjectCode',
+                pageBuilder: (context, state) => MaterialPage(
+                  child: SubjectAttandanceScreen(
+                    subject: state.pathParameters['subject']!,
+                    subjectCode: state.pathParameters['subjectCode']!,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // PROFILE
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorProfileKey,
+            routes: [
+              GoRoute(
+                path: '/profile_screen',
+                pageBuilder: (context, state) => const MaterialPage(
+                  child: ProfileScreen(),
+                ),
+              ),
+            ],
+          ),
+
+          // FACULTY
+          StatefulShellBranch(
+            navigatorKey: _shellNavigatorFacultyKey,
+            routes: [
+              GoRoute(
+                path: '/screens/faculty/search',
+                pageBuilder: (context, state) => const MaterialPage(
+                  child: FacultySearch(),
+                ),
+              ),
+              GoRoute(
+                name: 'faculty_time_table',
+                path:
+                    '/screens/faculty/time_table/:tutor/:tutorCode/:sem',
+                pageBuilder: (context, state) => MaterialPage(
+                  child: FacultyTT(
+                    tutor: state.pathParameters['tutor']!,
+                    tutorCode: state.pathParameters['tutorCode']!,
+                    sem: state.pathParameters['sem']!,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // LOGIN
+      GoRoute(
+        path: '/authentication/login_screen',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: LoginScreen(),
         ),
-        GoRoute(
-          path: '/authentication/manual_login',
-          pageBuilder: (context, state) =>
-              const MaterialPage(child: ManualRelogin()),
+      ),
+
+      // MANUAL LOGIN
+      GoRoute(
+        path: '/authentication/manual_login',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: ManualRelogin(),
         ),
-        GoRoute(
-          path: '/about_screen',
-          pageBuilder: (context, state) =>
-              const MaterialPage(child: AboutScreen()),
+      ),
+
+      // ABOUT
+      GoRoute(
+        path: '/about_screen',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: AboutScreen(),
         ),
-        GoRoute(
-          path: '/initial_screen',
-          pageBuilder: (context, state) =>
-              const MaterialPage(child: InitialScreen()),
+      ),
+
+      // INITIAL SCREEN
+      GoRoute(
+        path: '/initial_screen',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: InitialScreen(),
         ),
-        GoRoute(
-          path: '/update_screen',
-          pageBuilder: (context, state) => const MaterialPage(
-              fullscreenDialog: true,
-              maintainState: true,
-              child: UpdateDialog()),
+      ),
+
+      // UPDATE
+      GoRoute(
+        path: '/update_screen',
+        pageBuilder: (context, state) => const MaterialPage(
+          fullscreenDialog: true,
+          maintainState: true,
+          child: UpdateDialog(),
         ),
-      ]);
+      ),
+    ],
+  );
 }
