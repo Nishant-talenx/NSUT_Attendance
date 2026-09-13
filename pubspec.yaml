@@ -28,7 +28,7 @@ dependencies:
   flutter_animate: ^4.4.0
   path_provider:
   intl:
-  collection: ^1.18.0 # Added direct dependency to fix build failure
+  collection: ^1.18.0
 
 dev_dependencies:
   flutter_test:
