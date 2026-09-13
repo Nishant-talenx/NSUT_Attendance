@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cookie_store/cookie_store.dart';
@@ -42,8 +43,9 @@ class Ims {
 
   final Map<String, String> baseHeaders = {
     'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/120.0.6099.119 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/120.0.6099.119 Safari/537.36',
     'Accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,'
         'image/avif,image/webp,*/*;q=0.8',
@@ -81,10 +83,12 @@ class Ims {
     final SharedPreferences prefs =
         await SharedPreferences.getInstance();
 
-    if (prefs.getString('cookies') != null) {
+    final savedCookies = prefs.getString('cookies');
+
+    if (savedCookies != null && savedCookies.isNotEmpty) {
       session.cookies = CookieStore()
         ..updateCookies(
-          prefs.getString('cookies')!,
+          savedCookies,
           'imsnsit.org',
           '/',
         );
@@ -97,9 +101,15 @@ class Ims {
 
     final String? savedUrls = prefs.getString('allUrls');
 
-    if (savedUrls != null) {
+    if (savedUrls != null && savedUrls.isNotEmpty) {
       try {
-        allUrls = jsonDecode(savedUrls);
+        final decoded = jsonDecode(savedUrls);
+
+        if (decoded is Map) {
+          allUrls = Map<String, dynamic>.from(decoded);
+        } else {
+          allUrls = {};
+        }
       } catch (_) {
         allUrls = {};
       }
@@ -113,7 +123,7 @@ class Ims {
   // SAVE SESSION
   // ------------------------------------------------------------
 
-  void store(Map<String, dynamic> data) async {
+  Future<void> store(Map<String, dynamic> data) async {
     final SharedPreferences prefs =
         await SharedPreferences.getInstance();
 
@@ -124,7 +134,10 @@ class Ims {
       if (value is String) {
         await prefs.setString(key, value);
       } else {
-        await prefs.setString(key, jsonEncode(value));
+        await prefs.setString(
+          key,
+          jsonEncode(value),
+        );
       }
     }
   }
@@ -139,22 +152,33 @@ class Ims {
     }
 
     try {
-      baseHeaders.addAll({
-        'Referer':
-            'https://www.imsnsit.org/imsnsit/student_login.php',
-      });
+      baseHeaders['Referer'] =
+          'https://www.imsnsit.org/imsnsit/student_login.php';
 
-      final response = await session.get(
-        Uri.parse(profileUrl!),
-        headers: baseHeaders,
-      );
+      final response = await session
+          .get(
+            Uri.parse(profileUrl!),
+            headers: baseHeaders,
+          )
+          .timeout(
+            const Duration(seconds: 5),
+          );
 
       if (response.body.contains('Session expired')) {
+        isAuthenticated = false;
         return false;
       }
 
+      if (response.body.contains('student_login.php') &&
+          response.body.contains('Password')) {
+        isAuthenticated = false;
+        return false;
+      }
+
+      isAuthenticated = true;
       return true;
     } catch (_) {
+      isAuthenticated = false;
       return false;
     }
   }
@@ -187,8 +211,10 @@ class Ims {
       }
 
       return HttpResult.unsuccesful;
-    } catch (_) {
+    } on TimeoutException {
       return HttpResult.timeout;
+    } catch (_) {
+      return HttpResult.unsuccesful;
     }
   }
 
@@ -236,7 +262,7 @@ class Ims {
             data: data,
           )
           .timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 8),
           );
 
       final doc = parse(response.body);
@@ -246,7 +272,7 @@ class Ims {
       );
 
       if (loginResults.length >= 3) {
-        final loginResult = loginResults[2].text;
+        final loginResult = loginResults[2].text.trim();
 
         if (loginResult.contains(
           'Invalid Security Number',
@@ -269,6 +295,10 @@ class Ims {
       final List<Element> links =
           doc.getElementsByTagName('a');
 
+      profileUrl = null;
+      myActivitiesUrl = null;
+      logoutUrl = null;
+
       for (final Element link in links) {
         final String text = link.text.trim();
         final String? href = link.attributes['href'];
@@ -290,7 +320,8 @@ class Ims {
         }
       }
 
-      if (myActivitiesUrl == null) {
+      if (myActivitiesUrl == null ||
+          myActivitiesUrl!.isEmpty) {
         isAuthenticated = false;
         return LoginProperties.timeout;
       }
@@ -298,17 +329,25 @@ class Ims {
       final methodResponse = await getAllUrls();
 
       if (methodResponse == HttpProperties.timeout) {
+        isAuthenticated = false;
         return LoginProperties.timeout;
       }
 
-      store({
+      if (methodResponse == HttpProperties.unsuccesful) {
+        isAuthenticated = false;
+        return LoginProperties.timeout;
+      }
+
+      final cookies = session.getCookies(
+        Uri.parse(
+          'https://www.imsnsit.org/imsnsit/student_login.php',
+        ),
+      );
+
+      await store({
         'username': username,
         'password': password,
-        'cookies': session.getCookies(
-          Uri.parse(
-            'https://www.imsnsit.org/imsnsit/student_login.php',
-          ),
-        ),
+        'cookies': cookies,
         'profileUrl': profileUrl ?? '',
         'myActivitiesUrl': myActivitiesUrl ?? '',
         'referrer': referrer ?? '',
@@ -323,8 +362,10 @@ class Ims {
 
       return LoginProperties.loginedSuccesfully;
     } on TimeoutException {
+      isAuthenticated = false;
       return LoginProperties.timeout;
     } catch (_) {
+      isAuthenticated = false;
       return LoginProperties.timeout;
     }
   }
@@ -337,23 +378,30 @@ class Ims {
     baseHeaders.addAll({
       'Referer':
           'https://www.imsnsit.org/imsnsit/',
-      'Sec-Fetch-User':
-          '?1',
+      'Sec-Fetch-User': '?1',
     });
 
-    await session.get(
-      Uri.parse(
-        'https://www.imsnsit.org/imsnsit/student_login110.php',
-      ),
-      headers: baseHeaders,
-    );
+    await session
+        .get(
+          Uri.parse(
+            'https://www.imsnsit.org/imsnsit/student_login110.php',
+          ),
+          headers: baseHeaders,
+        )
+        .timeout(
+          const Duration(seconds: 8),
+        );
 
-    final response = await session.get(
-      Uri.parse(
-        'https://www.imsnsit.org/imsnsit/student_login.php',
-      ),
-      headers: baseHeaders,
-    );
+    final response = await session
+        .get(
+          Uri.parse(
+            'https://www.imsnsit.org/imsnsit/student_login.php',
+          ),
+          headers: baseHeaders,
+        )
+        .timeout(
+          const Duration(seconds: 8),
+        );
 
     final doc = parse(response.body);
 
@@ -365,7 +413,9 @@ class Ims {
 
     if (captchaElement == null ||
         hrandElement == null) {
-      throw Exception('Unable to load captcha');
+      throw Exception(
+        'Unable to load captcha',
+      );
     }
 
     final String? captchaSource =
@@ -374,8 +424,13 @@ class Ims {
     final String? hrand =
         hrandElement.attributes['value'];
 
-    if (captchaSource == null || hrand == null) {
-      throw Exception('Invalid captcha data');
+    if (captchaSource == null ||
+        captchaSource.isEmpty ||
+        hrand == null ||
+        hrand.isEmpty) {
+      throw Exception(
+        'Invalid captcha data',
+      );
     }
 
     hrandNum = hrand;
@@ -395,10 +450,8 @@ class Ims {
       return {};
     }
 
-    baseHeaders.addAll({
-      'Referer':
-          'https://www.imsnsit.org/imsnsit/student_login.php',
-    });
+    baseHeaders['Referer'] =
+        'https://www.imsnsit.org/imsnsit/student_login.php';
 
     final response = await session.get(
       Uri.parse(profileUrl!),
@@ -417,7 +470,8 @@ class Ims {
     final String? imagePath =
         profileData['profile_image'];
 
-    if (imagePath != null && imagePath.isNotEmpty) {
+    if (imagePath != null &&
+        imagePath.isNotEmpty) {
       final profileImageUrl =
           baseUrl.resolve(imagePath).toString();
 
@@ -452,7 +506,7 @@ class Ims {
             headers: baseHeaders,
           )
           .timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 8),
           );
 
       final doc = parse(response.body);
@@ -548,18 +602,22 @@ class Ims {
     final doc = parse(response.body);
 
     final String encYear =
-        doc.getElementById('enc_year')?.attributes['value'] ??
+        doc.getElementById('enc_year')
+                ?.attributes['value'] ??
             '';
 
     final String encSem =
-        doc.getElementById('enc_sem')?.attributes['value'] ??
+        doc.getElementById('enc_sem')
+                ?.attributes['value'] ??
             '';
 
     if (rollNo == '' ||
         dept == null ||
         degree == null) {
       rollNo = doc
-              .querySelector('[name=recentitycode]')
+              .querySelector(
+                '[name=recentitycode]',
+              )
               ?.attributes['value'] ??
           '';
 
@@ -640,18 +698,22 @@ class Ims {
     final doc = parse(response.body);
 
     final String encYear =
-        doc.getElementById('enc_year')?.attributes['value'] ??
+        doc.getElementById('enc_year')
+                ?.attributes['value'] ??
             '';
 
     final String encSem =
-        doc.getElementById('enc_sem')?.attributes['value'] ??
+        doc.getElementById('enc_sem')
+                ?.attributes['value'] ??
             '';
 
     if (rollNo == '' ||
         dept == null ||
         degree == null) {
       rollNo = doc
-              .querySelector('[name=recentitycode]')
+              .querySelector(
+                '[name=recentitycode]',
+              )
               ?.attributes['value'] ??
           '';
 
@@ -707,7 +769,7 @@ class Ims {
   // LOGOUT
   // ------------------------------------------------------------
 
-  void logout() async {
+  Future<void> logout() async {
     if (logoutUrl != null &&
         logoutUrl!.isNotEmpty) {
       try {
