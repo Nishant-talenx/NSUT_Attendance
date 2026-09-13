@@ -1,4 +1,3 @@
-```dart
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,10 +15,16 @@ enum DataType {
 }
 
 class Functions {
-  static Future<String> getImageFileFromAssets(String path) async {
-    final byteData = await rootBundle.load('assets/$path');
+  static Future<String> getImageFileFromAssets(
+    String path,
+  ) async {
+    final byteData = await rootBundle.load(
+      'assets/$path',
+    );
 
-    final file = File('${(await getTemporaryDirectory()).path}/$path');
+    final file = File(
+      '${(await getTemporaryDirectory()).path}/$path',
+    );
 
     await file.create(recursive: true);
 
@@ -39,14 +44,17 @@ class Functions {
   }) async {
     final headers = {
       'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.6099.119 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+          'AppleWebKit/537.36 Chrome/120.0.6099.119 '
+          'Safari/537.36',
     };
 
     if (referrer != null) {
       headers['Referer'] = referrer;
     }
 
-    final fileInfo = await DefaultCacheManager().downloadFile(
+    final fileInfo =
+        await DefaultCacheManager().downloadFile(
       imageUrl,
       authHeaders: headers,
     );
@@ -54,7 +62,9 @@ class Functions {
     return fileInfo.file.path;
   }
 
-  static Future<String> performOcr(String imagePath) async {
+  static Future<String> performOcr(
+    String imagePath,
+  ) async {
     return FlutterTesseractOcr.extractText(
       imagePath,
       language: 'mydigits',
@@ -68,7 +78,8 @@ class Functions {
     String jsonData,
     DataType dataType,
   ) async {
-    final appDir = await getApplicationDocumentsDirectory();
+    final appDir =
+        await getApplicationDocumentsDirectory();
 
     late final String filePath;
     late final String prefKey;
@@ -85,7 +96,8 @@ class Functions {
         filePath = appDir.absolute.uri
             .resolve('subjectWiseAttendance.json')
             .toFilePath();
-        prefKey = 'subjectWiseAttendanceDataLastUpdated';
+        prefKey =
+            'subjectWiseAttendanceDataLastUpdated';
         break;
 
       case DataType.profile:
@@ -100,19 +112,21 @@ class Functions {
 
     await file.writeAsString(jsonData);
 
-    final sharedPreferences =
+    final prefs =
         await SharedPreferences.getInstance();
 
     final date =
-        DateFormat('dd MMM, yyyy HH:mm').format(DateTime.now());
+        DateFormat('dd MMM, yyyy HH:mm')
+            .format(DateTime.now());
 
-    await sharedPreferences.setString(prefKey, date);
-
-    print('$dataType data successfully stored');
+    await prefs.setString(prefKey, date);
   }
 
-  static Future<dynamic> getJsonFromFile(DataType dataType) async {
-    final appDir = await getApplicationDocumentsDirectory();
+  static Future<dynamic> getJsonFromFile(
+    DataType dataType,
+  ) async {
+    final appDir =
+        await getApplicationDocumentsDirectory();
 
     late final String filePath;
 
@@ -138,39 +152,33 @@ class Functions {
 
     final file = File(filePath);
 
-    final jsonData = await file.readAsString();
-    final data = jsonDecode(jsonData);
+    final jsonData =
+        await file.readAsString();
 
-    late dynamic properData;
+    final data = jsonDecode(jsonData);
 
     switch (dataType) {
       case DataType.attendance:
-        properData = data as Map<String, dynamic>;
-        break;
+        return data as Map<String, dynamic>;
 
       case DataType.absoluteAttendance:
-        properData = data as Map<String, dynamic>;
-        break;
+        return data as Map<String, dynamic>;
 
       case DataType.profile:
-        properData = (data as Map<String, dynamic>).map(
-          (key, value) => MapEntry(
-            key,
-            value.toString(),
-          ),
+        return (data as Map<String, dynamic>).map(
+          (key, value) =>
+              MapEntry(key, value.toString()),
         );
-        break;
     }
-
-    print('$dataType data successfully loaded');
-
-    return properData;
   }
 }
 
 String cleanUrlKey(String input) {
   final words = input
-      .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '')
+      .replaceAll(
+        RegExp(r'[^a-zA-Z0-9\s]'),
+        '',
+      )
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
       .toList();
@@ -181,4 +189,3 @@ String cleanUrlKey(String input) {
 
   return words.join('').toLowerCase();
 }
-```
