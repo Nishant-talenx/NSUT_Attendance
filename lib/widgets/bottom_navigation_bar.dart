@@ -1,4 +1,3 @@
-```dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,7 +15,8 @@ class MyBottomNavigationBar extends StatefulWidget {
 class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
   int _selectedIndex = 1;
 
-  late final SharedPreferences prefs = context.read<SharedPreferences>();
+  late final SharedPreferences prefs =
+      context.read<SharedPreferences>();
 
   final List<int> disabledIndexes = [];
 
@@ -68,13 +68,13 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
             selectedItemColor:
                 theme.colorScheme.onSecondary.withAlpha(150),
             selectedLabelStyle: GoogleFonts.lexend(),
-            unselectedItemColor: theme.colorScheme.onBackground,
+            unselectedItemColor: theme.colorScheme.onSurface,
             unselectedLabelStyle: GoogleFonts.lexend(),
             selectedIconTheme: IconThemeData(
               color: theme.colorScheme.onSecondary.withAlpha(150),
             ),
             unselectedIconTheme: IconThemeData(
-              color: theme.colorScheme.onBackground,
+              color: theme.colorScheme.onSurface,
             ),
             backgroundColor: theme.colorScheme.primary,
             type: BottomNavigationBarType.fixed,
@@ -97,4 +97,3 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
     );
   }
 }
-```
