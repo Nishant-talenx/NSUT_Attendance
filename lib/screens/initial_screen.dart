@@ -4,17 +4,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:imsnsit/model/imsnsit.dart';
 import 'package:imsnsit/provider/ims_provider.dart';
 import 'package:imsnsit/provider/intenet_availability.dart';
-import 'package:imsnsit/model/functions.dart';
 import 'package:imsnsit/provider/mode_provider.dart';
 import 'package:imsnsit/provider/version.dart';
+import 'package:imsnsit/widgets/conditional_visibilty.dart';
 import 'package:imsnsit/widgets/update_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:imsnsit/widgets/conditional_visibilty.dart';
 
-enum NeedToLogin { checking, no, yes, completeLogin }
-
-enum LoggingIn { wait, successful, unsuccessful }
+enum NeedToLogin {
+  checking,
+  no,
+  yes,
+  completeLogin,
+}
 
 class InitialScreen extends StatefulWidget {
   const InitialScreen({super.key});
@@ -24,39 +26,167 @@ class InitialScreen extends StatefulWidget {
 }
 
 class _InitialScreenState extends State<InitialScreen> {
-  bool imsLoggedIn = false;
-  bool checkingForUpdate = false;
-  Future<bool?> waitForUpdateDialog = Future.delayed(Duration.zero);
-
   HttpResult internetAvailable = HttpResult.waiting;
   HttpResult imsUp = HttpResult.waiting;
+
   NeedToLogin userLoggedIn = NeedToLogin.checking;
-  LoggingIn loggingIn = LoggingIn.wait;
+
+  bool checkingForUpdate = false;
   bool useOfflineMode = false;
   bool retry = false;
 
-  late InternetProvider internetProvider = context.read<InternetProvider>();
-  late VersionProvider versionProvider = context.read<VersionProvider>();
-  late Ims ims = context.read<ImsProvider>().ims;
+  late final InternetProvider internetProvider;
+  late final VersionProvider versionProvider;
+  late final Ims ims;
+
+  Future<bool?> waitForUpdateDialog =
+      Future<bool?>.value(false);
+
+  @override
+  void initState() {
+    super.initState();
+
+    internetProvider = context.read<InternetProvider>();
+    versionProvider = context.read<VersionProvider>();
+    ims = context.read<ImsProvider>().ims;
+
+    context.read<ModeProvider>().reset();
+
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    final availability =
+        await internetProvider.checkForInternet();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      internetAvailable = availability;
+    });
+
+    if (!availability.value) {
+      setOfflineMode();
+      return;
+    }
+
+    _checkForUpdate();
+
+    final serverStatus = await ims.isImsUp();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      imsUp = serverStatus;
+    });
+
+    if (!serverStatus.value) {
+      setOfflineMode();
+      return;
+    }
+
+    final loginStatus = await doesUserNeedToLogin();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      userLoggedIn = loginStatus;
+    });
+
+    if (loginStatus == NeedToLogin.no) {
+      waitForUpdateDialog.whenComplete(() {
+        if (!mounted) {
+          return;
+        }
+
+        context.go('/attendance/total');
+      });
+
+      return;
+    }
+
+    if (loginStatus == NeedToLogin.completeLogin) {
+      waitForUpdateDialog.whenComplete(() {
+        if (!mounted) {
+          return;
+        }
+
+        context.go('/authentication/login_screen');
+      });
+
+      return;
+    }
+
+    /*
+     * The old app attempted to solve the IMS CAPTCHA
+     * automatically using Tesseract OCR.
+     *
+     * We removed OCR because the trained data file is
+     * not part of the repository.
+     *
+     * Instead, send the user directly to the existing
+     * manual CAPTCHA screen.
+     */
+    waitForUpdateDialog.whenComplete(() {
+      if (!mounted) {
+        return;
+      }
+
+      context.go('/authentication/manual_login');
+    });
+  }
 
   Future<NeedToLogin> doesUserNeedToLogin() async {
     if (ims.username != null && ims.password != null) {
-      final isUserLoggedIn = await ims.isUserAuthenticated();
+      final authenticated =
+          await ims.isUserAuthenticated();
 
-      if (isUserLoggedIn) {
+      if (authenticated) {
         return NeedToLogin.no;
       }
+
       return NeedToLogin.yes;
-    } else {
-      return NeedToLogin.completeLogin;
     }
+
+    return NeedToLogin.completeLogin;
+  }
+
+  void _checkForUpdate() {
+    versionProvider.isLatestVersion().then((isUpdateAvailable) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        checkingForUpdate = true;
+      });
+
+      if (isUpdateAvailable) {
+        waitForUpdateDialog = showDialog<bool>(
+          barrierColor: Colors.transparent,
+          context: context,
+          builder: (_) => const UpdateDialog(),
+        ).then((_) {
+          return false;
+        });
+      }
+    });
   }
 
   void setOfflineMode() {
     final prefs = context.read<SharedPreferences>();
 
-    if (prefs.containsKey('attendanceDataLastUpdated')) {
+    if (prefs.containsKey(
+      'attendanceDataLastUpdated',
+    )) {
       context.read<ModeProvider>().setOffline();
+
       setState(() {
         useOfflineMode = true;
         retry = true;
@@ -68,345 +198,164 @@ class _InitialScreenState extends State<InitialScreen> {
     }
   }
 
-  Future<void> showTimeoutDialog() async {
-    await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-              backgroundColor: const Color.fromARGB(255, 169, 37, 16),
-              title: Text(
-                'An error has occured',
-                style: GoogleFonts.roboto(
-                    fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              content: Text(
-                'Timeout occurred when connecting to ims website, Please try again.',
-                style: GoogleFonts.roboto(),
-              ),
-              actions: [
-                TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text(
-                      "Ok",
-                      style: TextStyle(color: Colors.white),
-                    )),
-              ],
-            ));
-  }
-
-  Future<bool> autoLogin() async {
-    String imageUrl = await ims.getCaptcha();
-    String imagePath = await Functions.downloadFile(imageUrl);
-
-    String captchaText = await Functions.performOcr(imagePath);
-
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    String username = prefs.getString('username')!;
-    String password = prefs.getString('password')!;
-
-    await ims.authenticate(captchaText, username, password).then((value) async {
-      if (value == LoginProperties.timeout) {
-        await showTimeoutDialog();
-        return ims.isAuthenticated;
-      }
-    });
-
-    return ims.isAuthenticated;
-  }
-
-  @override
-  void initState() {
-    context.read<ModeProvider>().reset();
-    internetProvider.checkForInternet().then((availability) {
-      setState(() {
-        internetAvailable = availability;
-
-        if (!availability.value) {
-          setOfflineMode();
-        }
-      });
-
-      if (internetAvailable.value) {
-        versionProvider.isLatestVersion().then((isUpdateAvailable) {
-          setState(() {
-            checkingForUpdate = true;
-          });
-
-          if (isUpdateAvailable) {
-            waitForUpdateDialog = showDialog(
-                barrierColor: Colors.transparent,
-                context: context,
-                builder: (_) => const UpdateDialog()).then((value) {
-              return false;
-            });
-          }
-        });
-
-        ims.isImsUp().then((isImsUp) {
-          setState(() {
-            imsUp = isImsUp;
-          });
-
-          if (!imsUp.value) {
-            setOfflineMode();
-            return;
-          }
-
-          doesUserNeedToLogin().then((value) {
-            setState(() {
-              userLoggedIn = value;
-            });
-
-            if (userLoggedIn == NeedToLogin.yes) {
-              autoLogin().then((loggingInResult) {
-                if (loggingInResult) {
-                  setState(() {
-                    loggingIn = LoggingIn.successful;
-                  });
-                  waitForUpdateDialog.whenComplete(() {
-                    context.go('/attendance/total');
-                  });
-                } else {
-                  setState(() {
-                    loggingIn = LoggingIn.unsuccessful;
-                  });
-                  waitForUpdateDialog.whenComplete(() {
-                    context.go('/authentication/manual_login');
-                  });
-                }
-              });
-            } else if (userLoggedIn == NeedToLogin.completeLogin) {
-              waitForUpdateDialog.whenComplete(() {
-                context.go('/authentication/login_screen');
-              });
-            } else {
-              waitForUpdateDialog.whenComplete(() {
-                context.go('/attendance/total');
-              });
-            }
-          });
-        });
-      }
-    });
-
-    // TODO: implement initState
-    super.initState();
+  void retryInitialization() {
+    context.push('/initial_screen');
   }
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = Theme.of(context).colorScheme.onSurface;
+    final baseColor =
+        Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
-      body: Center(
-        child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConditionalyVisible(
-                showIf: true,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Checking for internet",
-                      style: GoogleFonts.lexend(),
-                    ),
-                    const SizedBox(
-                      width: 20,
-                    ),
-                    SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: internetAvailable.value
-                            ? Icon(
-                                Icons.check,
-                                color: baseColor,
-                              )
-                            : (internetAvailable == HttpResult.waiting
-                                ? CircularProgressIndicator(
-                                    color: baseColor,
-                                  )
-                                : Icon(
-                                    Icons.close,
-                                    color: baseColor,
-                                  )))
-                  ],
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ConditionalyVisible(
+                  showIf: true,
+                  child: _statusRow(
+                    text: 'Checking internet',
+                    completed:
+                        internetAvailable.value,
+                    waiting:
+                        internetAvailable ==
+                            HttpResult.waiting,
+                    color: baseColor,
+                  ),
                 ),
-              ),
-              ConditionalyVisible(
-                showIf: internetAvailable.value == true,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Checking for update",
-                      style: GoogleFonts.lexend(),
-                    ),
-                    const SizedBox(
-                      width: 20,
-                    ),
-                    SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: checkingForUpdate
-                            ? Icon(
-                                Icons.check,
-                                color: baseColor,
-                              )
-                            : CircularProgressIndicator(
-                                color: baseColor,
-                              ))
-                  ],
+
+                ConditionalyVisible(
+                  showIf: internetAvailable.value,
+                  child: _statusRow(
+                    text: 'Checking for updates',
+                    completed: checkingForUpdate,
+                    waiting: !checkingForUpdate,
+                    color: baseColor,
+                  ),
                 ),
-              ),
-              ConditionalyVisible(
-                showIf: checkingForUpdate == true,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Ims Website Working",
-                      style: GoogleFonts.lexend(),
-                    ),
-                    const SizedBox(
-                      width: 20,
-                    ),
-                    SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: imsUp.value
-                            ? Icon(
-                                Icons.check,
-                                color: baseColor,
-                              )
-                            : (imsUp == HttpResult.waiting
-                                ? CircularProgressIndicator(
-                                    color: baseColor,
-                                  )
-                                : Icon(
-                                    Icons.close,
-                                    color: baseColor,
-                                  )))
-                  ],
+
+                ConditionalyVisible(
+                  showIf: checkingForUpdate,
+                  child: _statusRow(
+                    text: 'NSUT IMS available',
+                    completed: imsUp.value,
+                    waiting:
+                        imsUp == HttpResult.waiting,
+                    color: baseColor,
+                  ),
                 ),
-              ),
-              ConditionalyVisible(
-                showIf: imsUp.value == true,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "User is logged in",
-                      style: GoogleFonts.lexend(),
-                    ),
-                    const SizedBox(
-                      width: 20,
-                    ),
-                    SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: userLoggedIn == NeedToLogin.checking
-                            ? CircularProgressIndicator(
-                                color: baseColor,
-                              )
-                            : (userLoggedIn == NeedToLogin.no)
-                                ? Icon(
-                                    Icons.check,
-                                    color: baseColor,
-                                  )
-                                : Icon(
-                                    Icons.close,
-                                    color: baseColor,
-                                  ))
-                  ],
+
+                ConditionalyVisible(
+                  showIf: imsUp.value,
+                  child: _statusRow(
+                    text: 'Checking login session',
+                    completed:
+                        userLoggedIn ==
+                            NeedToLogin.no,
+                    waiting:
+                        userLoggedIn ==
+                            NeedToLogin.checking,
+                    color: baseColor,
+                  ),
                 ),
-              ),
-              ConditionalyVisible(
-                showIf: userLoggedIn == NeedToLogin.yes,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Trying to login",
-                      style: GoogleFonts.lexend(),
-                    ),
-                    const SizedBox(
-                      width: 20,
-                    ),
-                    SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: loggingIn == LoggingIn.wait
-                            ? CircularProgressIndicator(
-                                color: baseColor,
-                              )
-                            : (loggingIn == LoggingIn.successful)
-                                ? Icon(
-                                    Icons.check,
-                                    color: baseColor,
-                                  )
-                                : Icon(
-                                    Icons.close,
-                                    color: baseColor,
-                                  ))
-                  ],
-                ),
-              ),
-              retry
-                  ? const SizedBox(
-                      height: 16,
-                    )
-                  : const SizedBox.shrink(),
-              ConditionalyVisible(
-                  showIf: retry,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.onBackground,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(8)))),
-                    icon: const Icon(Icons.refresh),
-                    label: Text(
-                      "Retry",
-                      style: GoogleFonts.lexend(
-                          fontSize: 15,
+
+                if (retry) ...[
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: 180,
+                    child: ElevatedButton.icon(
+                      onPressed: retryInitialization,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                      ),
+                      label: Text(
+                        'Retry',
+                        style: GoogleFonts.lexend(
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
                     ),
-                    onPressed: () {
-                      context.push('/initial_screen');
-                    },
-                  )),
-              useOfflineMode
-                  ? const SizedBox(
-                      height: 16,
-                    )
-                  : const SizedBox.shrink(),
-              ConditionalyVisible(
-                  showIf: useOfflineMode,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.onBackground,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(8)))),
-                    icon: const Icon(
-                        Icons.signal_wifi_connected_no_internet_4_rounded),
-                    label: Text(
-                      "Use offline Mode",
-                      style: GoogleFonts.lexend(
-                          fontSize: 15,
+                  ),
+                ],
+
+                if (useOfflineMode) ...[
+                  const SizedBox(height: 10),
+
+                  SizedBox(
+                    width: 180,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        context
+                            .read<ModeProvider>()
+                            .setOffline();
+
+                        context.go(
+                          '/attendance/total',
+                        );
+                      },
+                      icon: const Icon(
+                        Icons
+                            .signal_wifi_connected_no_internet_4_rounded,
+                      ),
+                      label: Text(
+                        'Offline Mode',
+                        style: GoogleFonts.lexend(
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
                     ),
-                    onPressed: () {
-                      context.read<ModeProvider>().setOffline();
-                      context.push('/attendance/total');
-                    },
-                  )),
-            ]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusRow({
+    required String text,
+    required bool completed,
+    required bool waiting,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 6,
+      ),
+      child: Row(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+        children: [
+          Text(
+            text,
+            style: GoogleFonts.lexend(),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: waiting
+                ? CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  )
+                : Icon(
+                    completed
+                        ? Icons.check
+                        : Icons.close,
+                    color: color,
+                  ),
+          ),
+        ],
       ),
     );
   }
